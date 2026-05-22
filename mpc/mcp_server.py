@@ -1,9 +1,11 @@
 from fastmcp import FastMCP
+import datetime
 
-# Ініціалізуємо сервер інструментів.
-# Цю назву побачить LLM Макса при підключенні.
+# Ініціалізація MCP-сервера.
 mcp = FastMCP("AgenticStudioTools")
 
+
+# 1. Інструмент: Калькулятор
 @mcp.tool()
 def calculate(operation: str, a: float, b: float) -> str:
     """
@@ -27,6 +29,14 @@ def calculate(operation: str, a: float, b: float) -> str:
     else:
         return f"Помилка: невідома операція '{operation}'."
 
+
+# 2. Інструмент: Системний час та дата
+@mcp.tool()
+def get_current_time() -> str:
+    """Повертає поточну дату та системний час."""
+    return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
 if __name__ == "__main__":
-    print("Запуск MCP Сервера 'AgenticStudioTools'...")
+    print("Запуск MCP Сервера 'AgenticStudioTools' з двома інструментами...")
     mcp.run()
