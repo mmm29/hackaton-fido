@@ -119,5 +119,4 @@ def analyze_damage_consistency(impact_direction: str, damaged_parts_json: str) -
 
 
 if __name__ == "__main__":
-    print("Запуск MCP Сервера 'InsuranceFraudInvestigator'...")
-    mcp.run()
+    mcp.run(transport="stdio", show_banner=False)

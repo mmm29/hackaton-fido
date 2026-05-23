@@ -192,10 +192,12 @@ def make_tool_execution_node(tool_registry: dict):
             tool_func = tool_registry.get(tool_name)
             if tool_func:
                 try:
-                    if asyncio.iscoroutinefunction(tool_func):
-                        result = await tool_func(**tool_args)
-                    else:
+                    if hasattr(tool_func, "ainvoke"):
+                        result = await tool_func.ainvoke(tool_args)
+                    elif hasattr(tool_func, "invoke"):
                         result = tool_func.invoke(tool_args)
+                    else:
+                        result = tool_func(**tool_args)
 
                     return {
                         "tool_call_id": tool_id,
@@ -377,11 +379,11 @@ class Agent:
     def __init__(self, llm: Llm, config: AgentConfiguration) -> None:
         self.llm = llm
         self.config = config
-        self.tools = [
-            tool for tool_name, tool in TOOLS.items() if tool_name in self.config.tools
-        ]
 
     def run(self, agent_input: AgentInput) -> AgentSession:
         return AgentSession(
-            self.llm, agent_input, self.tools, system_prompt=self.config.system_prompt
+            self.llm,
+            agent_input,
+            self.config.tools,
+            system_prompt=self.config.system_prompt,
         )
