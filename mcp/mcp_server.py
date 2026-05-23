@@ -38,5 +38,4 @@ def get_current_time() -> str:
 
 
 if __name__ == "__main__":
-    print("Запуск MCP Сервера 'AgenticStudioTools' з двома інструментами...")
-    mcp.run()
+    mcp.run(transport="stdio", show_banner=False)
