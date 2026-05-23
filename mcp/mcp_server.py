@@ -21,9 +21,9 @@ def check_historical_weather(latitude: float, longitude: float, date_str: str) -
         if response.status_code == 200:
             data = response.json()
             daily = data.get("daily", {})
-            max_t = daily.get('temperature_2m_max', ['N/A'])[0]
-            min_t = daily.get('temperature_2m_min', ['N/A'])[0]
-            precip = daily.get('precipitation_sum', ['0'])[0]
+            max_t = daily.get("temperature_2m_max", ["N/A"])[0]
+            min_t = daily.get("temperature_2m_min", ["N/A"])[0]
+            precip = daily.get("precipitation_sum", ["0"])[0]
 
             report = f"Фактична погода {date_str}:\nТемпература: від {min_t}°C до {max_t}°C.\nОпади: {precip} мм.\n"
             if float(precip) > 5:
@@ -90,18 +90,27 @@ def analyze_damage_consistency(impact_direction: str, damaged_parts_json: str) -
             part_lower = part.lower().strip()
 
             # Якщо удар ззаду, але міняють передні деталі
-            if impact_direction == "rear" and any(fp in part_lower for fp in front_parts):
+            if impact_direction == "rear" and any(
+                fp in part_lower for fp in front_parts
+            ):
                 anomalies.append(
-                    f"Деталь '{part}' знаходиться спереду, але заявлений удар був ззаду ('{impact_direction}').")
+                    f"Деталь '{part}' знаходиться спереду, але заявлений удар був ззаду ('{impact_direction}')."
+                )
 
             # Якщо удар спереду, але міняють задні деталі
-            if impact_direction == "front" and any(rp in part_lower for rp in rear_parts):
+            if impact_direction == "front" and any(
+                rp in part_lower for rp in rear_parts
+            ):
                 anomalies.append(
-                    f"Деталь '{part}' знаходиться ззаду, але заявлений удар був спереду ('{impact_direction}').")
+                    f"Деталь '{part}' знаходиться ззаду, але заявлений удар був спереду ('{impact_direction}')."
+                )
 
         if anomalies:
-            return "🚩 ВИЯВЛЕНО ФІЗИЧНІ НЕСТИКОВКИ В ДТП:\n" + "\n".join(
-                anomalies) + "\nЙмовірність шахрайства: ВИСОКА."
+            return (
+                "🚩 ВИЯВЛЕНО ФІЗИЧНІ НЕСТИКОВКИ В ДТП:\n"
+                + "\n".join(anomalies)
+                + "\nЙмовірність шахрайства: ВИСОКА."
+            )
         else:
             return "✅ Фізика пошкоджень відповідає напрямку удару. Підозрілих деталей не виявлено."
 

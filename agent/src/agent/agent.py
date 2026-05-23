@@ -29,6 +29,10 @@ class Llm:
         return Llm(self.llm.bind_tools(tools))
 
 
+def list_tools() -> list[str]:
+    return list(TOOLS.keys())
+
+
 def create_llm():
     base_url = os.environ["OPENAI_BASE_URL"]
     api_key = os.environ["OPENAI_API_KEY"]
@@ -226,7 +230,7 @@ def make_tool_execution_node(tool_registry: dict):
         return {
             "messages": new_messages,
             "tool_results": tool_results,
-            "tool_calls": [],  # Clear tool calls after execution
+            "tool_calls": [],
             "content": "Tools called.",
         }
 
@@ -310,7 +314,13 @@ def should_retry(state: AgentState) -> Literal["agent", "answer"]:
 
 
 class AgentSession:
-    def __init__(self, llm: Llm, agent_input: AgentInput, tools: list) -> None:
+    def __init__(
+        self,
+        llm: Llm,
+        agent_input: AgentInput,
+        tools: list,
+        system_prompt: str | None = None,
+    ) -> None:
         tool_registry = {tool.name: tool for tool in tools}
 
         graph = StateGraph(AgentState)
@@ -337,8 +347,11 @@ class AgentSession:
         graph.add_edge("answer", END)
 
         self.app = graph.compile()
+        initial_messages = [HumanMessage(content=agent_input.user_input)]
+        if system_prompt is not None:
+            initial_messages.insert(0, SystemMessage(content=system_prompt))
         initial_state = AgentState(
-            messages=[HumanMessage(content=agent_input.user_input)]
+            messages=initial_messages,
         )
         self.steps = self.app.astream(initial_state)
 
@@ -357,13 +370,18 @@ class AgentSession:
 @dataclass
 class AgentConfiguration:
     tools: list[str]
+    system_prompt: str | None = None
 
 
 class Agent:
     def __init__(self, llm: Llm, config: AgentConfiguration) -> None:
         self.llm = llm
         self.config = config
-        self.tools = list(TOOLS.values())
+        self.tools = [
+            tool for tool_name, tool in TOOLS.items() if tool_name in self.config.tools
+        ]
 
     def run(self, agent_input: AgentInput) -> AgentSession:
-        return AgentSession(self.llm, agent_input, self.tools)
+        return AgentSession(
+            self.llm, agent_input, self.tools, system_prompt=self.config.system_prompt
+        )

@@ -305,6 +305,26 @@ function BuilderView({ agent, onSaved, setToast }) {
   const [topics, setTopics] = useState(agent?.forbidden_topics ?? []);
   const [saving, setSaving] = useState(false);
 
+  const [availableTools, setAvailableTools] = useState([]);
+  const [selectedTools, setSelectedTools] = useState(agent?.allowed_tools ?? ["calculator"]);
+  const [toolsLoading, setToolsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchTools = async () => {
+      const res = await fetch(`${API_BASE}/tools`);
+      if (!res.ok) throw new Error(await res.text());
+      const tools = await res.json();
+      setAvailableTools(tools);
+      // Ensure selected tools exist in available tools
+      setSelectedTools(prev => 
+        prev.filter(tool => tools.some(t => t.tool_name === tool))
+      );
+
+      setToolsLoading(false);
+    };
+    fetchTools();
+  }, []);
+
   const addTopic = () => {
     const t = topicInput.trim();
     if (t && !topics.includes(t)) setTopics(ts => [...ts, t]);
@@ -356,10 +376,51 @@ function BuilderView({ agent, onSaved, setToast }) {
       <div className="model-chip">gemini-2.5-flash</div>
 
       <div className="section-label" style={{ marginTop: 18 }}>Tools</div>
-      <div className="tool-chip-only">
-        ⊞ calculator
-        <span className="tool-chip-lock">· only tool</span>
-      </div>
+      {toolsLoading ? (
+        <div style={{ padding: "8px 0" }}>
+          <span className="spinner" /> Loading tools...
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {availableTools.map(tool => {
+            const isSelected = selectedTools.includes(tool.tool_name);
+            return (
+              <label 
+                key={tool.tool_name}
+                style={{
+                  display: "flex", alignItems: "center", gap: 8,
+                  padding: "8px 12px",
+                  background: "var(--bg3)",
+                  border: `1px solid ${isSelected ? "var(--accent)" : "var(--border)"}`,
+                  borderRadius: 8,
+                  cursor: "pointer",
+                  fontSize: 13,
+                  fontWeight: 500,
+                  transition: "border-color .15s"
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={isSelected}
+                  onChange={() => {
+                    setSelectedTools(prev =>
+                      isSelected
+                        ? prev.filter(t => t !== tool.tool_name)
+                        : [...prev, tool.tool_name]
+                    );
+                  }}
+                />
+                ⊞ {tool.tool_name}
+              </label>
+            );
+          })}
+          {availableTools.length === 0 && (
+            <div style={{ color: "var(--muted)", fontSize: 12, padding: "8px 0" }}>
+              No tools available
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="section-label" style={{ marginTop: 18 }}>Guardrails</div>
 

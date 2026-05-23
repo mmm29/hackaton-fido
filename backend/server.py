@@ -12,7 +12,7 @@ from fastapi import FastAPI, APIRouter, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from agent.agent import Agent, create_llm, AgentInput, AgentConfiguration
+from agent.agent import Agent, create_llm, list_tools, AgentInput, AgentConfiguration
 
 
 class AgentCreate(BaseModel):
@@ -117,6 +117,15 @@ async def run_agent(agent: Agent, user_input: str) -> tuple[str, str, List[Event
 router = APIRouter()
 
 
+class ToolResponse(BaseModel):
+    tool_name: str
+
+
+@router.get("/tools", response_model=List[ToolResponse])
+async def list_tools_api():
+    return [ToolResponse(tool_name=tool) for tool in list_tools()]
+
+
 @router.get("/agents", response_model=List[AgentOut])
 async def list_agents():
     return [v.agent_out for _, v in agents_db.items()]
@@ -126,7 +135,9 @@ async def list_agents():
 async def create_agent(agent: AgentCreate):
     agent_id = str(uuid.uuid4())
     new_agent = AgentOut(id=agent_id, **agent.dict())
-    config = AgentConfiguration(tools=["search_web", "calculate", "get_current_time"])
+    config = AgentConfiguration(
+        tools=agent.allowed_tools, system_prompt=agent.system_prompt
+    )
     agents_db[agent_id] = AgentItem(new_agent, Agent(llm, config))
     return new_agent
 
