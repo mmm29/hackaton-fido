@@ -1,0 +1,15 @@
+[project]
+name = "agent"
+version = "0.1"
+
+dependencies = [
+    "langgraph",
+    "langchain_openai",
+    "pydantic",
+    "langchain-mcp-adapters",
+    "fastmcp"
+]
+
+[build-system]
+requires = ["setuptools >= 77.0.3"]
+build-backend = "setuptools.build_meta"
