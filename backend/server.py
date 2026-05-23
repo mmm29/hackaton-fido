@@ -87,18 +87,10 @@ async def run_agent(agent: Agent, user_input: str) -> tuple[str, str, List[Event
             title="User Input",
             payload=user_input,
         ),
-        EventOut(
-            id=str(uuid.uuid4()),
-            run_id="",
-            step=2,
-            type="final_answer",
-            title="Final Answer",
-            payload="I'm a calculator agent. Please ask me to compute a math expression.",
-        ),
     ]
     final_answer = ""
 
-    step_id = 1
+    step_id = 2
     while True:
         result = await session.step()
         if result.stage is None:
