@@ -2,6 +2,7 @@ import json
 import re
 import ast
 import uuid
+import asyncio
 from typing import List, Optional
 
 from dotenv import load_dotenv
@@ -12,7 +13,8 @@ from fastapi import FastAPI, APIRouter, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from agent.agent import Agent, create_llm, list_tools, AgentInput, AgentConfiguration
+from agent.agent import Agent, create_llm, AgentInput, AgentConfiguration
+from agent.tools import MCPRuntime
 
 
 class AgentCreate(BaseModel):
@@ -69,11 +71,24 @@ agents_db: dict[str, AgentItem] = {}
 runs_db: dict[str, RunOut] = {}
 events_db: dict[str, List[EventOut]] = {}
 llm = create_llm()
+mcp = None
+tools = None
+
+
+async def get_mcp_tools() -> dict:
+    global mcp, tools
+
+    if mcp is None:
+        mcp = MCPRuntime()
+        tools = await mcp.start()
+        tools = {tool.name: tool for tool in tools}
+
+    assert tools is not None
+
+    return tools
 
 
 async def run_agent(agent: Agent, user_input: str) -> tuple[str, str, List[EventOut]]:
-    config = AgentConfiguration(tools=["search_web", "calculate", "get_current_time"])
-    agent = Agent(llm, config)
     agent_input = AgentInput(user_input=user_input)
 
     session = agent.run(agent_input)
@@ -123,7 +138,8 @@ class ToolResponse(BaseModel):
 
 @router.get("/tools", response_model=List[ToolResponse])
 async def list_tools_api():
-    return [ToolResponse(tool_name=tool) for tool in list_tools()]
+    tools = await get_mcp_tools()
+    return [ToolResponse(tool_name=tool) for tool in tools]
 
 
 @router.get("/agents", response_model=List[AgentOut])
@@ -135,8 +151,10 @@ async def list_agents():
 async def create_agent(agent: AgentCreate):
     agent_id = str(uuid.uuid4())
     new_agent = AgentOut(id=agent_id, **agent.dict())
+    tools = await get_mcp_tools()
     config = AgentConfiguration(
-        tools=agent.allowed_tools, system_prompt=agent.system_prompt
+        tools=[tools[tool_name] for tool_name in agent.allowed_tools],
+        system_prompt=agent.system_prompt,
     )
     agents_db[agent_id] = AgentItem(new_agent, Agent(llm, config))
     return new_agent

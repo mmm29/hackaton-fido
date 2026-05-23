@@ -1,6 +1,7 @@
 from fastmcp import FastMCP
 import requests
 import json
+import datetime
 
 # Ініціалізація сервера
 mcp = FastMCP("InsuranceFraudInvestigator")
@@ -116,6 +117,12 @@ def analyze_damage_consistency(impact_direction: str, damaged_parts_json: str) -
 
     except Exception as e:
         return f"Помилка аналізу пошкоджень: {str(e)}"
+
+
+@mcp.tool()
+def get_current_time() -> str:
+    """Повертає поточну дату та системний час."""
+    return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
 if __name__ == "__main__":

@@ -29,10 +29,6 @@ class Llm:
         return Llm(self.llm.bind_tools(tools))
 
 
-def list_tools() -> list[str]:
-    return list(TOOLS.keys())
-
-
 def create_llm():
     base_url = os.environ["OPENAI_BASE_URL"]
     api_key = os.environ["OPENAI_API_KEY"]
@@ -40,35 +36,6 @@ def create_llm():
 
     # return Llm(ChatGoogleGenerativeAI(model=model_id, api_key=api_key))
     return Llm(ChatOpenAI(model=model_id, api_key=api_key, base_url=base_url))
-
-
-@tool
-def calculate(expression: str) -> str:
-    """Evaluate a mathematical expression.
-
-    Args:
-        expression: Mathematical expression to evaluate (e.g., "2 + 2", "15 * 3")
-    """
-    try:
-        result = eval(expression, {"__builtins__": {}}, {})
-        return f"Result: {expression} = {result}"
-    except Exception as e:
-        return f"Error calculating: {str(e)}"
-
-
-@tool
-def get_current_time() -> str:
-    """Get the current date and time."""
-    from datetime import datetime
-
-    return f"Current time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-
-
-# Tool registry
-TOOLS = {
-    "calculate": calculate,
-    "get_current_time": get_current_time,
-}
 
 
 class Tool:
@@ -360,6 +327,7 @@ class AgentSession:
     async def step(self) -> AgentStepResult:
         try:
             res = await anext(self.steps)
+            print(res)
             node_name = list(res.keys())[0] if res else None
             dat = res[node_name]
             return AgentStepResult(
@@ -384,6 +352,6 @@ class Agent:
         return AgentSession(
             self.llm,
             agent_input,
-            self.config.tools,
+            tools=self.config.tools,
             system_prompt=self.config.system_prompt,
         )

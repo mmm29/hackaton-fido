@@ -306,7 +306,7 @@ function BuilderView({ agent, onSaved, setToast }) {
   const [saving, setSaving] = useState(false);
 
   const [availableTools, setAvailableTools] = useState([]);
-  const [selectedTools, setSelectedTools] = useState(agent?.allowed_tools ?? ["calculator"]);
+  const [selectedTools, setSelectedTools] = useState(agent?.allowed_tools ?? []);
   const [toolsLoading, setToolsLoading] = useState(true);
 
   useEffect(() => {
@@ -341,7 +341,7 @@ function BuilderView({ agent, onSaved, setToast }) {
       system_prompt: prompt,
       model_provider: "gemini",
       model_name: "gemini-2.5-flash",
-      allowed_tools: ["calculator"],
+      allowed_tools: selectedTools,
       max_steps: maxSteps,
       forbidden_topics: topics,
     };
