@@ -1,17 +1,14 @@
 from dataclasses import dataclass
+from typing import Any
 
-from langgraph.graph import StateGraph
-from langchain_core.messages import SystemMessage, HumanMessage, BaseMessage
-from pydantic import BaseModel
+from langgraph.graph import StateGraph, END
+from langchain_core.messages import BaseMessage
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class Llm:
-    def invoke(self, messages: list[BaseMessage]):
+    async def invoke(self, messages: list[BaseMessage]):
         raise NotImplementedError
-
-
-class Tool:
-    pass
 
 
 @dataclass
@@ -22,94 +19,141 @@ class AgentInput:
 @dataclass
 class AgentStepResult:
     stage: str | None
+    data: dict | None = None
 
 
 class AgentState(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     user_input: str
-
-
-# TODO: todo
-PLANNER_SYSTEM = None
+    selected_tool: str | None = None
+    tool_args: dict[str, Any] = Field(default_factory=dict)
+    tool_result: Any | None = None
+    answer: str | None = None
 
 
 def make_plan_node(llm: Llm):
     async def plan_node(state: AgentState) -> dict:
-        # resp = await llm.invoke(
-        #     [
-        #         SystemMessage(content=PLANNER_SYSTEM),
-        #         HumanMessage(content=state.user_input),
-        #     ]
-        # )
+        text = state.user_input.lower()
+
+        if "час" in text or "time" in text:
+            return {
+                "selected_tool": "get_current_time",
+                "tool_args": {},
+            }
+
+        if "аналіз" in text or "графік" in text or "поліном" in text:
+            return {
+                "selected_tool": "analyze_and_plot_points",
+                "tool_args": {
+                    "points": [[1, 2], [2, 4.1], [3, 6.2], [4, 8.1], [5, 10.3]],
+                    "degree": 1,
+                },
+            }
 
         return {
-            # "plan": resp.content if hasattr(resp, "content") else str(resp),
-            # "phase": "research",
-            # "messages": [
-            #     SystemMessage(content=RESEARCH_SYSTEM),
-            #     HumanMessage(content=f"User message:\n{q}\n\nPlan:\n{resp.content}"),
-            # ],
+            "answer": "Поки агент не зрозумів, який інструмент потрібно викликати."
         }
 
     return plan_node
 
 
-def make_tool_node():
-    raise NotImplementedError
+def make_tool_node(tools: list):
+    tools_by_name = {tool.name: tool for tool in tools}
 
+    async def tool_node(state: AgentState) -> dict:
+        if state.selected_tool is None:
+            return {}
 
-def make_agent_node():
-    async def agent_node(state: AgentState) -> dict:
-        return {}
+        tool = tools_by_name.get(state.selected_tool)
 
-    return agent_node
+        if tool is None:
+            return {
+                "tool_result": {
+                    "error": f"Tool '{state.selected_tool}' not found."
+                }
+            }
 
+        result = await tool.ainvoke(state.tool_args)
 
-def make_validate_node():
-    async def validation_node(state: AgentState) -> dict:
-        return {}
+        return {
+            "tool_result": result,
+        }
 
-    return validation_node
+    return tool_node
 
 
 def make_answer_node():
     async def answer_node(state: AgentState) -> dict:
-        return {}
+        if state.answer is not None:
+            return {
+                "answer": state.answer,
+            }
+
+        return {
+            "answer": f"Результат виконання tool '{state.selected_tool}': {state.tool_result}"
+        }
 
     return answer_node
 
 
+def route_after_plan(state: AgentState) -> str:
+    if state.selected_tool is not None:
+        return "tools"
+
+    return "answer"
+
+
 class AgentSession:
-    def __init__(self, llm: Llm, agent_input: AgentInput) -> None:
+    def __init__(self, llm: Llm, config: "AgentConfiguration", agent_input: AgentInput) -> None:
         self.llm = llm
+        self.config = config
 
         graph = StateGraph(AgentState)
 
         graph.add_node("plan", make_plan_node(llm))
-        graph.add_node("agent", make_agent_node())
-        # graph.add_node("tools", make_tool_node())
-        # graph.add_node("validate", make_validate_node())
+        graph.add_node("tools", make_tool_node(config.tools))
         graph.add_node("answer", make_answer_node())
 
         graph.set_entry_point("plan")
-        graph.add_edge("plan", "agent")
-        graph.add_edge("agent", "answer")
+
+        graph.add_conditional_edges(
+            "plan",
+            route_after_plan,
+            {
+                "tools": "tools",
+                "answer": "answer",
+            },
+        )
+
+        graph.add_edge("tools", "answer")
+        graph.add_edge("answer", END)
 
         self.app = graph.compile()
+
         initial_state = AgentState(user_input=agent_input.user_input)
         self.steps = self.app.astream(initial_state)
 
     async def step(self) -> AgentStepResult:
         try:
             res = await anext(self.steps)
-            print(res)
-            return 0
+            stage = next(iter(res.keys())) if res else None
+
+            return AgentStepResult(
+                stage=stage,
+                data=res,
+            )
+
         except StopAsyncIteration:
-            return 0
+            return AgentStepResult(
+                stage=None,
+                data={"done": True},
+            )
 
 
 @dataclass
 class AgentConfiguration:
-    tools: list[str]
+    tools: list
 
 
 class Agent:
@@ -118,4 +162,4 @@ class Agent:
         self.config = config
 
     def run(self, agent_input: AgentInput) -> AgentSession:
-        return AgentSession(self.llm, agent_input)
+        return AgentSession(self.llm, self.config, agent_input)
